@@ -101,8 +101,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <body>
 
 <div id="ldo">
-  <div class="spin"></div>
-  <div id="lmsg">Cargando datos desde Google Sheets...</div>
+  <div class="spin" id="lspin"></div>
+  <div id="lmsg">Abriendo planilla de Google Sheets...</div>
+  <div id="lbtn" style="display:none;flex-direction:column;align-items:center;gap:12px;margin-top:12px">
+    <a href="https://docs.google.com/spreadsheets/d/1xKUNfB6u5eou8qRY_siL9vmoiNIbk0D3niZ3G1-FZ3k/edit" target="_blank"
+       style="padding:10px 28px;background:#1f6feb;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none">
+      📊 Abrir planilla de Google Sheets
+    </a>
+    <div style="color:#7d8590;font-size:12px;text-align:center;max-width:320px">
+      Esperá 1-2 minutos a que actualice los datos, luego hacé clic en el botón verde.
+    </div>
+    <button onclick="confirmarCarga()" style="padding:10px 28px;background:#238636;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">
+      ✅ Planilla actualizada — Cargar datos
+    </button>
+  </div>
 </div>
 
 <header>
@@ -278,8 +290,18 @@ function renderScanner() {
   ms.textContent = mok ? '✅ Mercado OK' : '🚫 Mercado bajista';
   ms.className = 'mbadge '+(mok?'mok':'mbad');
 
-  const cand = DATA.filter(a => a['SEÑAL']==='COMPRA');
-  document.getElementById('sc0').textContent = cand.length;
+  const todasSenal = DATA.filter(a => a['SEÑAL']==='COMPRA');
+  // Solo mostrar las que tienen beneficio > riesgo (R/B > 1)
+  const cand = todasSenal.filter(a => {
+    const precio = n(a['Precio']);
+    const sma200 = n(a['SMA200']);
+    const max52  = n(a['Max 52s']);
+    if (!precio || !sma200 || !max52) return false;
+    const riesgo   = precio - sma200;
+    const beneficio = max52 - precio;
+    return riesgo > 0 && beneficio > riesgo; // R/B > 1
+  });
+  document.getElementById('sc0').textContent = cand.length + (todasSenal.length > cand.length ? ' (de ' + todasSenal.length + ')' : '');
   document.getElementById('b0').textContent = cand.length;
 
   const tb = document.getElementById('tb-scanner');
@@ -350,7 +372,12 @@ function renderPanel() {
 }
 
 function mostrarAlertas() {
-  const cand = DATA.filter(a => a['SEÑAL']==='COMPRA');
+  const cand = DATA.filter(a => {
+    if (a['SEÑAL'] !== 'COMPRA') return false;
+    const precio = n(a['Precio']), sma200 = n(a['SMA200']), max52 = n(a['Max 52s']);
+    if (!precio || !sma200 || !max52) return false;
+    return (precio - sma200) > 0 && (max52 - precio) > (precio - sma200);
+  });
   const banner = document.getElementById('alertaBanner');
   if (!cand.length) { banner.style.display='none'; return; }
 
@@ -553,7 +580,23 @@ function tick(){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')cm();});
 document.getElementById('ovl').addEventListener('click',function(e){if(e.target===this)cm();});
 setInterval(tick,1000);
-cargar();
+
+const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1xKUNfB6u5eou8qRY_siL9vmoiNIbk0D3niZ3G1-FZ3k/edit';
+
+function iniciar() {
+  document.getElementById('lspin').style.display = 'none';
+  document.getElementById('lmsg').textContent = 'Para empezar, abrí la planilla y esperá que actualice los datos';
+  document.getElementById('lbtn').style.display = 'flex';
+}
+
+function confirmarCarga() {
+  document.getElementById('lbtn').style.display = 'none';
+  document.getElementById('lspin').style.display = 'block';
+  document.getElementById('lmsg').textContent = 'Cargando datos desde Google Sheets...';
+  cargar();
+}
+
+iniciar();
 </script>
 </body>
 </html>
