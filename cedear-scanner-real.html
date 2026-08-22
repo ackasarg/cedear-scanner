@@ -31,7 +31,7 @@ header{background:var(--s);border-bottom:1px solid var(--b);padding:10px 20px;di
 main{max-width:1500px;margin:0 auto;padding:16px 20px}
 
 /* EMBUDO VISUAL */
-.funnel{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.funnel{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:16px}
 .fcard{border-radius:8px;padding:12px 14px;border:1px solid}
 .fcard-green{background:linear-gradient(135deg,rgba(63,185,80,.1),var(--s));border-color:var(--gs)}
 .fcard-purple{background:linear-gradient(135deg,rgba(163,113,247,.1),var(--s));border-color:var(--pus)}
@@ -192,6 +192,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="fv yel" id="fc-vg">—</div>
       <div class="fs" id="fc-vgs" style="color:var(--m)">Acercándose al cruce</div>
     </div>
+    <div class="fcard" style="background:linear-gradient(135deg,rgba(88,166,255,.08),var(--s));border-color:var(--ac)">
+      <div class="fl">🔄 Cruces — toda zona</div>
+      <div class="fv" style="color:var(--bl)" id="fc-cr">—</div>
+      <div class="fs" id="fc-crs" style="color:var(--m)">Sin filtro de zona</div>
+    </div>
     <div class="fcard fcard-green">
       <div class="fl">📈 Continuación</div>
       <div class="fv pos" id="fc-ct">—</div>
@@ -225,6 +230,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="tabs">
     <div class="tab on" onclick="sw('al',this)">★ Alerta <span class="tbadge" style="background:rgba(163,113,247,.2);color:var(--pu)" id="t-al">0</span></div>
     <div class="tab" onclick="sw('vg',this)">⏳ Vigilancia <span class="tbadge by" id="t-vg">0</span></div>
+    <div class="tab" onclick="sw('cr',this)">🔄 Cruces <span class="tbadge" style="background:rgba(88,166,255,.2);color:var(--bl)" id="t-cr">0</span></div>
     <div class="tab" onclick="sw('ct',this)">📈 Continuación <span class="tbadge bg" id="t-ct">0</span></div>
     <div class="tab" onclick="sw('n3',this)">🔴 En radar <span class="tbadge bo" id="t-n3">0</span></div>
     <div class="tab" onclick="sw('pos',this)">Posiciones <span class="tbadge bb" id="t-pos">0</span></div>
@@ -241,6 +247,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <br>Universo: papeles castigados (pre-filtro por caída desde el máx. 52s + liquidez). NO son las señales alcistas de la planilla.
       <br><span style="color:var(--y)">⚠️ Entrada contra tendencia — el stop pegado al mínimo reciente es obligatorio.</span>
     </div>
+    <div id="diag" style="padding:0 0 10px;color:var(--m);font-size:11px"></div>
     <div class="tw"><table><thead><tr>
       <th>Ticker</th><th>Nombre</th><th>Precio</th><th>Var%</th><th>RVOL</th>
       <th>RSI</th><th>RSI ayer</th><th>MACD</th><th>Señal</th><th>Cruce</th>
@@ -262,6 +269,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <th>Faltan</th><th>Pos. rango</th><th>vsMáx52s</th><th>R/B</th>
     </tr></thead><tbody id="tb-vg">
       <tr><td colspan="15" class="empty"><div class="eico">⏳</div>Analizando...</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <!-- 🔄 CRUCES EN CUALQUIER ZONA -->
+  <div class="panel" id="panel-cr">
+    <div style="padding:6px 0 10px;color:var(--m);font-size:11px;line-height:1.6">
+      El mismo dibujo — MACD cruzando al alza sobre su señal con el RSI girando — pero <strong>sin exigir que sea en el piso</strong>. Se clasifica por dónde ocurrió el cruce:
+      <br>🔻 <strong style="color:var(--pu)">Profunda</strong>: bien abajo de cero. Es reversión de fondo (estos también aparecen en ★ Alerta).
+      &nbsp;·&nbsp; ⚖️ <strong style="color:var(--y)">Cerca de cero</strong>: la zona de transición, donde una tendencia cambia de mano.
+      &nbsp;·&nbsp; 🔺 <strong style="color:var(--g)">Positiva</strong>: cruce arriba de cero — no es un piso, es un respiro dentro de una suba.
+      <br>La zona se mide como el MACD dividido por la amplitud de su propio rango reciente, así el número es comparable entre papeles de $3 y de $400.
+      <br><span style="color:var(--m)">Sólo se exige: cruce en la ventana + RSI girando al alza + R/B ≥ mínimo. Sin filtro de nivel de RSI.</span>
+    </div>
+    <div class="tw"><table><thead><tr>
+      <th>Ticker</th><th>Nombre</th><th>Precio</th><th>Var%</th><th>RVOL</th>
+      <th>Zona</th><th>MACD</th><th>Señal</th><th>Cruce</th><th>RSI</th><th>RSI ayer</th>
+      <th>Pos. rango</th><th>vsMáx52s</th><th>Stop</th><th>Objetivo</th><th>R/B</th><th>Acción</th>
+    </tr></thead><tbody id="tb-cr">
+      <tr><td colspan="17" class="empty"><div class="eico">🔄</div>Analizando...</td></tr>
     </tbody></table></div>
   </div>
 
@@ -359,13 +385,15 @@ const REV = {
   activo:        true,
   diasHistoria:  400,   // días CALENDARIO que se le piden a Yahoo (~270 ruedas)
   maxBarras:     250,   // ruedas que se conservan para el cálculo
-  maxCandidatos: 60,    // tope de tickers a consultar (cada uno = 1 llamada al proxy)
-  pausaMs:       120,   // pausa entre llamadas para no ahogar el proxy
+  maxCandidatos: 0,     // 0 = SIN TOPE (analiza todos los que pasen el pre-filtro)
+  concurrencia:  5,     // llamadas simultáneas al proxy. Subir = más rápido, más riesgo de rate-limit
+  pausaMs:       0,     // pausa extra por llamada (con concurrencia ya no hace falta)
 
   // Pre-filtro sobre la planilla (qué papeles vale la pena mirar)
-  caidaMin:      0.08,  // al menos 8% por debajo del máx 52s
-  caidaMax:      0.55,  // no más de 55% (abajo de eso suele ser otra historia)
-  rvolMin:       0.4,   // liquidez mínima
+  // Para analizar los 414 sin excepción: caidaMin:0, caidaMax:1, rvolMin:0
+  caidaMin:      0.03,  // al menos 3% por debajo del máx 52s
+  caidaMax:      0.92,  // tope superior de caída
+  rvolMin:       0.15,  // liquidez mínima
 
   // Reglas de la señal
   ventanaCruce:  2,     // el cruce vale si fue hoy o hasta N ruedas atrás
@@ -381,11 +409,16 @@ const REV = {
   vgRsiMax:      50,    // RSI todavía bajo
   vgMaxRuedas:   10,    // sólo mostrar si el cruce se proyecta dentro de N ruedas
 
+  // ── CRUCES EN CUALQUIER ZONA ──
+  umbralZona:    0.20,  // |MACD| ÷ amplitud del rango. Debajo de esto = "cerca de cero"
+  crRsiMax:      70,    // techo de RSI para el grupo genérico (100 = sin techo).
+                        // Evita mostrar cruces que ocurren ya en sobrecompra.
+
   // Cálculo del stop y el objetivo (distintos a los del modo continuación)
   ventanaStop:   20,    // el stop es el mínimo de las últimas N ruedas
   colchonStop:   0.99   // menos 1% de colchón
 };
-let REV_LIST=[], REV_CASI=[];
+let REV_LIST=[], REV_CASI=[], REV_CRUCES=[], REV_DIAG=null;
 
 // STATE
 let DATA=[], POS=JSON.parse(localStorage.getItem('cp')||'[]'), HIST=JSON.parse(localStorage.getItem('ch')||'[]');
@@ -538,8 +571,18 @@ function detectarReversion(closes,fila){
     && pos<=REV.vgPercentil && rsi<REV.vgRsiMax
     && ruedasAlCruce!==null && ruedasAlCruce<=REV.vgMaxRuedas;
 
+  // ── CRUCE EN CUALQUIER ZONA ──
+  // Mismo dibujo (cruce alcista + RSI girando + R/B sano) pero sin exigir que
+  // sea bajo cero ni en el mínimo. La zona se mide como el MACD dividido por la
+  // amplitud de su propio rango: así es comparable entre papeles de $3 y $400.
+  const amplitud=mx-mn;
+  const rel=amplitud>0?m.macd[t]/amplitud:0;
+  const zona = rel<-REV.umbralZona ? 'profunda' : rel>REV.umbralZona ? 'positiva' : 'cero';
+  const cruceGenerico = r1 && r5 && r6 && rsi<REV.crRsiMax;
+
   return{
     ok:falta.length===0,nd:false,reglas,falta,acercandose,
+    cruceGenerico, zona, rel:+rel.toFixed(2),
     hist3:hOk?h.map(v=>+v.toFixed(3)):null, ruedasAlCruce,
     rsi:+rsi.toFixed(1), rsiAyer:rsiAyer!==null?+rsiAyer.toFixed(1):null,
     macd:+m.macd[t].toFixed(3), signal:+m.signal[t].toFixed(3),
@@ -572,7 +615,7 @@ function calcRSISerie(c,p=14){
 // Clave: NO se parte de SEÑAL=COMPRA. Esas ya son alcistas y por definición
 // nunca tendrían el MACD cruzando bajo cero con el RSI en el piso.
 function prefiltroReversion(){
-  return DATA
+  const base=DATA
     .filter(a=>{
       if(n(a.Precio)===0)return false;
       if(a.Tipo&&/indice|índice/i.test(a.Tipo))return false;
@@ -581,14 +624,33 @@ function prefiltroReversion(){
       if(n(a.RVOL)<REV.rvolMin)return false;
       return true;
     })
-    .sort((a,b)=>n(b.RVOL)-n(a.RVOL))               // los más líquidos primero
-    .slice(0,REV.maxCandidatos);
+    .sort((a,b)=>n(b.RVOL)-n(a.RVOL));              // los más líquidos primero
+  return REV.maxCandidatos>0?base.slice(0,REV.maxCandidatos):base;
+}
+
+// Ejecuta fn sobre items con N workers en paralelo (no todos de golpe:
+// 414 fetch simultáneos hacen que el proxy corte por rate-limit)
+async function poolMap(items,limite,fn,onProgress){
+  const out=new Array(items.length);
+  let idx=0,hechos=0;
+  const worker=async()=>{
+    while(true){
+      const k=idx++;
+      if(k>=items.length)break;
+      try{out[k]=await fn(items[k]);}catch(e){out[k]=null;}
+      hechos++;
+      if(onProgress)onProgress(hechos,items.length,items[k]);
+      if(REV.pausaMs)await new Promise(r=>setTimeout(r,REV.pausaMs));
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(limite,items.length)},worker));
+  return out;
 }
 
 async function fetchReversion(){
   if(!REV.activo)return;
   const cands=prefiltroReversion();
-  const tbA=document.getElementById('tb-al'),tbV=document.getElementById('tb-vg');
+  const tbA=document.getElementById('tb-al'),tbV=document.getElementById('tb-vg'),tbC=document.getElementById('tb-cr');
   if(!cands.length){
     tbA.innerHTML='<tr><td colspan="16" class="empty"><div class="eico">🟣</div>Ningún papel pasa el pre-filtro (caída entre '+(REV.caidaMin*100)+'% y '+(REV.caidaMax*100)+'% con RVOL ≥ '+REV.rvolMin+').</td></tr>';
     tbV.innerHTML='<tr><td colspan="15" class="empty">—</td></tr>';
@@ -596,23 +658,36 @@ async function fetchReversion(){
     document.getElementById('fc-vg').textContent='0';
     return;
   }
-  const alerta=[],vigil=[];
-  for(let i=0;i<cands.length;i++){
-    const a=cands[i];
-    const prog='<div class="loading-row"><div class="mini-spin"></div>Analizando '+(i+1)+'/'+cands.length+' — '+a.Ticker+'</div>';
-    tbA.innerHTML='<tr><td colspan="16" class="empty">'+prog+'</td></tr>';
-    tbV.innerHTML='<tr><td colspan="15" class="empty">'+prog+'</td></tr>';
+  const alerta=[],vigil=[],cruces=[];
+  let sinDatos=0,histCorta=0;
+  const t0=Date.now();
+  const pintar=(hechos,total,a)=>{
+    const prog='<div class="loading-row"><div class="mini-spin"></div>Analizando '+hechos+'/'+total+
+      ' &nbsp;·&nbsp; '+alerta.length+' alertas · '+vigil.length+' en vigilancia'+
+      (sinDatos?' · '+sinDatos+' sin datos':'')+'</div>';
+    if(hechos%3===0||hechos===total){
+      tbA.innerHTML='<tr><td colspan="16" class="empty">'+prog+'</td></tr>';
+      tbV.innerHTML='<tr><td colspan="15" class="empty">'+prog+'</td></tr>';
+      tbC.innerHTML='<tr><td colspan="17" class="empty">'+prog+'</td></tr>';
+    }
+  };
+  await poolMap(cands,REV.concurrencia,async(a)=>{
     const closes=await fetchCloses(a.Ticker,REV.diasHistoria,REV.maxBarras);
+    if(!closes){sinDatos++;return null;}
     const d=detectarReversion(closes,a);
-    if(d.nd)continue;
+    if(d.nd){histCorta++;return null;}
     if(d.ok)alerta.push({...a,rev:d});
     else if(d.acercandose)vigil.push({...a,rev:d});
-    if(REV.pausaMs)await new Promise(r=>setTimeout(r,REV.pausaMs));
-  }
+    if(d.cruceGenerico)cruces.push({...a,rev:d});   // independiente: puede solaparse con alerta
+    return null;
+  },pintar);
+  REV_DIAG={total:cands.length,universo:DATA.length,sinDatos,histCorta,seg:Math.round((Date.now()-t0)/1000)};
+  const ordZona={profunda:0,cero:1,positiva:2};
   alerta.sort((x,y)=>y.rev.rb-x.rev.rb);
   vigil.sort((x,y)=>x.rev.ruedasAlCruce-y.rev.ruedasAlCruce);
-  REV_LIST=alerta;REV_CASI=vigil;
-  renderAlerta();renderVigil();
+  cruces.sort((x,y)=>(ordZona[x.rev.zona]-ordZona[y.rev.zona])||(y.rev.rb-x.rev.rb));
+  REV_LIST=alerta;REV_CASI=vigil;REV_CRUCES=cruces;
+  renderAlerta();renderVigil();renderCruces();
 }
 
 function renderAlerta(){
@@ -632,6 +707,14 @@ function renderAlerta(){
   } else b.innerHTML='';
 
   const tb=document.getElementById('tb-al');tb.innerHTML='';
+  const dg=document.getElementById('diag');
+  if(dg&&REV_DIAG){
+    const d=REV_DIAG;
+    dg.innerHTML=`Escaneados <strong style="color:var(--t)">${d.total}</strong> de ${d.universo} papeles de la planilla en ${d.seg}s`
+      +(d.sinDatos?` · <span style="color:var(--r)">${d.sinDatos} sin respuesta de Yahoo/proxy</span>`:'')
+      +(d.histCorta?` · <span style="color:var(--y)">${d.histCorta} con historia insuficiente</span>`:'')
+      +` · el resto quedó fuera del pre-filtro (caída ${(REV.caidaMin*100).toFixed(0)}-${(REV.caidaMax*100).toFixed(0)}%, RVOL ≥ ${REV.rvolMin})`;
+  }
   if(!res.length){
     tb.innerHTML='<tr><td colspan="16" class="empty"><div class="eico">🟣</div>Ningún cruce alcista bajo cero con RSI en mínimo ahora.<br><span style="font-size:11px">Mirá la pestaña Vigilancia: ahí están los que se están acercando.</span></td></tr>';
     return;
@@ -707,8 +790,53 @@ function renderVigil(){
   });
 }
 
+function renderCruces(){
+  const res=REV_CRUCES;
+  const Z={
+    profunda:{ico:'🔻',txt:'Profunda',col:'var(--pu)',bg:'rgba(163,113,247,.12)'},
+    cero:    {ico:'⚖️',txt:'Cerca de cero',col:'var(--y)',bg:'rgba(210,153,34,.12)'},
+    positiva:{ico:'🔺',txt:'Positiva',col:'var(--g)',bg:'rgba(63,185,80,.12)'}
+  };
+  const cnt=z=>res.filter(a=>a.rev.zona===z).length;
+  document.getElementById('fc-cr').textContent=res.length;
+  document.getElementById('t-cr').textContent=res.length;
+  document.getElementById('fc-crs').textContent=
+    res.length===0?'Sin cruces hoy':`🔻${cnt('profunda')} ⚖️${cnt('cero')} 🔺${cnt('positiva')}`;
+
+  const tb=document.getElementById('tb-cr');tb.innerHTML='';
+  if(!res.length){
+    tb.innerHTML='<tr><td colspan="17" class="empty"><div class="eico">🔄</div>Ningún cruce alcista con RSI girando y R/B ≥ '+REV.rbMin+' en ninguna zona.</td></tr>';
+    return;
+  }
+  const enAlerta=new Set(REV_LIST.map(a=>a.Ticker));
+  res.forEach(a=>{
+    const d=a.rev,z=Z[d.zona],varD=n(a['Var % dia']),rvol=n(a.RVOL),pvm=n(a['% vs max 52s']);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="tc">${enAlerta.has(a.Ticker)?'★ ':''}${a.Ticker}</td>
+      <td class="nc">${a.Nombre}</td>
+      <td class="pc">$${f2(a.Precio)}</td>
+      <td class="${varD>=0?'pos':'neg'}">${varD>=0?'+':''}${varD.toFixed(2)}%</td>
+      <td class="${rvol>=1.5?'pos':'neu'}">${rvol.toFixed(2)}x</td>
+      <td><span class="rb-badge" style="background:${z.bg};color:${z.col}">${z.ico} ${z.txt}</span>
+          <span style="color:var(--m);font-size:10px"> ${d.rel>0?'+':''}${d.rel}</span></td>
+      <td class="${d.macd<0?'neg':'pos'}">${d.macd}</td>
+      <td class="neu">${d.signal}</td>
+      <td style="color:${z.col}">hace ${d.ruedasCruce}r</td>
+      <td class="${d.rsi<40?'purp':d.rsi>65?'neg':'yel'}" style="font-weight:700">${d.rsi}</td>
+      <td class="neu">${d.rsiAyer!==null?d.rsiAyer:'—'}</td>
+      <td>${d.pos}%</td>
+      <td class="${pvm>-0.1?'pos':'neg'}">${(pvm*100).toFixed(1)}%</td>
+      <td class="neg">$${d.stop.toFixed(2)}</td>
+      <td class="pos">$${d.obj.toFixed(2)}</td>
+      <td class="${d.rb>=2?'pos':'yel'}">${d.rb.toFixed(1)}:1</td>
+      <td><button class="btn" style="background:${z.bg};color:${z.col};border:1px solid ${z.col}" onclick="showBuyRev('${a.Ticker.replace(/'/g,"\\'")}')">Ver señal</button></td>`;
+    tb.appendChild(tr);
+  });
+}
+
 function showBuyRev(ticker){
-  const a=REV_LIST.find(x=>x.Ticker===ticker)||REV_CASI.find(x=>x.Ticker===ticker);
+  const a=REV_LIST.find(x=>x.Ticker===ticker)||REV_CRUCES.find(x=>x.Ticker===ticker)||REV_CASI.find(x=>x.Ticker===ticker);
   if(!a)return;
   const d=a.rev,precio=n(a.Precio);
   const rbc=d.rb>=2?'var(--g)':d.rb>=1.5?'var(--y)':'var(--r)';
@@ -1169,7 +1297,7 @@ function sw(name,el){
 }
 function swName(name){
   const tabs=document.querySelectorAll('.tab');
-  ['al','vg','ct','n3','pos','panel','hist'].forEach((nm,i)=>{
+  ['al','vg','cr','ct','n3','pos','panel','hist'].forEach((nm,i)=>{
     tabs[i].classList.toggle('on',nm===name);
     document.getElementById('panel-'+nm).classList.toggle('on',nm===name);
   });
