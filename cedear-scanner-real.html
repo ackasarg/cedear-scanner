@@ -13,6 +13,7 @@
   --y:#d29922;--yb:#272115;
   --bl:#58a6ff;--ac:#1f6feb;
   --or:#e06c00;--orb:#1f1200;
+  --pu:#a371f7;--pub:#1a1226;--pus:#8957e5;
   --mono:'Courier New',monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -30,9 +31,10 @@ header{background:var(--s);border-bottom:1px solid var(--b);padding:10px 20px;di
 main{max-width:1500px;margin:0 auto;padding:16px 20px}
 
 /* EMBUDO VISUAL */
-.funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.funnel{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
 .fcard{border-radius:8px;padding:12px 14px;border:1px solid}
 .fcard-green{background:linear-gradient(135deg,rgba(63,185,80,.1),var(--s));border-color:var(--gs)}
+.fcard-purple{background:linear-gradient(135deg,rgba(163,113,247,.1),var(--s));border-color:var(--pus)}
 .fcard-yellow{background:linear-gradient(135deg,rgba(210,153,34,.08),var(--s));border-color:#9e6a03}
 .fcard-orange{background:linear-gradient(135deg,rgba(224,108,0,.08),var(--s));border-color:#c05000}
 .fcard-gray{background:var(--s);border-color:var(--b)}
@@ -40,7 +42,7 @@ main{max-width:1500px;margin:0 auto;padding:16px 20px}
 .fl{color:var(--m);font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
 .fv{font-size:22px;font-weight:700;font-family:var(--mono)}
 .fs{font-size:11px;margin-top:2px}
-.pos{color:var(--g)}.neg{color:var(--r)}.neu{color:var(--m)}.yel{color:var(--y)}.orang{color:var(--or)}
+.pos{color:var(--g)}.neg{color:var(--r)}.neu{color:var(--m)}.yel{color:var(--y)}.orang{color:var(--or)}.purp{color:var(--pu)}
 
 /* EMBUDO ARROW */
 .funnel-arrow{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--b);padding-top:20px}
@@ -190,6 +192,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div class="fv yel" id="fc2">—</div>
       <div class="fs" id="fc2s" style="color:var(--m)">5 criterios + sin momentum</div>
     </div>
+    <div class="fcard fcard-purple">
+      <div class="fl">🟣 Reversión</div>
+      <div class="fv purp" id="fcrev">—</div>
+      <div class="fs" id="fcrevs" style="color:var(--m)">MACD cruza bajo cero</div>
+    </div>
     <div class="fcard fcard-orange">
       <div class="fl">🔴 Nivel 3 — En radar</div>
       <div class="fv orang" id="fc3">—</div>
@@ -209,6 +216,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
   <!-- BANNERS -->
   <div id="b-n1"></div>
+  <div id="b-rev"></div>
   <div id="b-n4"></div>
   <div id="b-n2"></div>
   <div id="b-n3"></div>
@@ -218,6 +226,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="tab on" onclick="sw('n1',this)">★ Confirmadas <span class="tbadge bg" id="t-n1">0</span></div>
     <div class="tab" onclick="sw('n2',this)">⏳ Vigilancia <span class="tbadge by" id="t-n2">0</span></div>
     <div class="tab" onclick="sw('n4',this)">🔵 Pre-señal <span class="tbadge" style="background:rgba(88,166,255,.2);color:var(--bl)" id="t-n4">0</span></div>
+    <div class="tab" onclick="sw('rev',this)">🟣 Reversión <span class="tbadge" style="background:rgba(163,113,247,.2);color:var(--pu)" id="t-rev">0</span></div>
     <div class="tab" onclick="sw('n3',this)">🔴 En radar <span class="tbadge bo" id="t-n3">0</span></div>
     <div class="tab" onclick="sw('pos',this)">Posiciones <span class="tbadge bb" id="t-pos">0</span></div>
     <div class="tab" onclick="sw('panel',this)">Panel técnico</div>
@@ -261,6 +270,23 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </tr></thead><tbody id="tb-n2">
       <tr><td colspan="14" class="empty"><div class="loading-row"><div class="mini-spin"></div>Analizando momentum...</div></td></tr>
     </tbody></table></div>
+  </div>
+
+  <!-- REVERSIÓN -->
+  <div class="panel" id="panel-rev">
+    <div style="padding:6px 0 10px;color:var(--m);font-size:11px;line-height:1.6">
+      <strong style="color:var(--pu)">Estrategia distinta a las demás pestañas.</strong> Acá NO se exige estructura alcista: se busca el cruce alcista del MACD <em>por debajo de cero</em> con el RSI en zona baja y girando — el piso, no la continuación.
+      <br>El universo NO son las señales de la planilla (esas ya son alcistas y nunca cumplirían esto), sino los papeles castigados: se pre-filtra por caída desde el máximo de 52 semanas y liquidez.
+      <br><span style="color:var(--y)">Riesgo: este filtro también agarra cuchillos cayendo. El stop y el R/B no son opcionales.</span>
+    </div>
+    <div class="tw"><table><thead><tr>
+      <th>Ticker</th><th>Nombre</th><th>Precio</th><th>Var%</th><th>RVOL</th>
+      <th>RSI</th><th>RSI ayer</th><th>MACD</th><th>Señal</th><th>Cruce</th>
+      <th>Pos. rango</th><th>vsMáx52s</th><th>Stop</th><th>Objetivo</th><th>R/B</th><th>Acción</th>
+    </tr></thead><tbody id="tb-rev">
+      <tr><td colspan="16" class="empty"><div class="eico">🟣</div>Esperando a que termine el análisis de momentum...</td></tr>
+    </tbody></table></div>
+    <div id="rev-casi" style="margin-top:12px"></div>
   </div>
 
   <!-- NIVEL 3: EN RADAR -->
@@ -329,6 +355,35 @@ const YP = 'https://corsproxy.io/?';
 const INT = 30*60*1000;
 const RSI_MIN=45, RSI_MAX=65;
 
+// ── CONFIG MODO REVERSIÓN ────────────────────────────────────────────────
+// Todos los umbrales acá. Tocá estos números, no la lógica de abajo.
+const REV = {
+  activo:        true,
+  diasHistoria:  400,   // días CALENDARIO que se le piden a Yahoo (~270 ruedas)
+  maxBarras:     250,   // ruedas que se conservan para el cálculo
+  maxCandidatos: 60,    // tope de tickers a consultar (cada uno = 1 llamada al proxy)
+  pausaMs:       120,   // pausa entre llamadas para no ahogar el proxy
+
+  // Pre-filtro sobre la planilla (qué papeles vale la pena mirar)
+  caidaMin:      0.08,  // al menos 8% por debajo del máx 52s
+  caidaMax:      0.55,  // no más de 55% (abajo de eso suele ser otra historia)
+  rvolMin:       0.4,   // liquidez mínima
+
+  // Reglas de la señal
+  ventanaCruce:  2,     // el cruce vale si fue hoy o hasta N ruedas atrás
+  exigirBajoCero:true,  // R2: el cruce tiene que ser en territorio negativo
+  ventanaRango:  60,    // ruedas para medir "zona de mínimo" del MACD
+  percentilMacd: 0.30,  // R3: MACD en el 30% más bajo de su propio rango
+  rsiMax:        40,    // R4: RSI por debajo de esto
+  rsiDebeSubir:  true,  // R5: RSI girando al alza
+  rbMin:         1.5,   // R6: ratio Riesgo/Beneficio mínimo
+
+  // Cálculo del stop y el objetivo (distintos a los del modo continuación)
+  ventanaStop:   20,    // el stop es el mínimo de las últimas N ruedas
+  colchonStop:   0.99   // menos 1% de colchón
+};
+let REV_LIST=[], REV_CASI=[];
+
 // STATE
 let DATA=[], POS=JSON.parse(localStorage.getItem('cp')||'[]'), HIST=JSON.parse(localStorage.getItem('ch')||'[]');
 let tStart=Date.now(), pIdx=0;
@@ -378,17 +433,256 @@ function calcMACD(c){
 }
 function c8Check(c){const n=c.length;return n>=4&&c[n-1]>c[n-2]&&c[n-2]>c[n-3]&&c[n-3]>c[n-4];}
 
-async function fetchCloses(ticker){
+async function fetchCloses(ticker,diasCal=90,maxBarras=45){
   try{
-    const to=Math.floor(Date.now()/1000),from=to-90*86400;
+    const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
     const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
     const res=await fetch(YP+encodeURIComponent(url));
     if(!res.ok)return null;
     const js=await res.json();
     const closes=js?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
     if(!closes)return null;
-    return closes.filter(c=>c!=null).slice(-45);
+    return closes.filter(c=>c!=null).slice(-maxBarras);
   }catch(e){return null;}
+}
+
+// ── MACD COMPLETO (series enteras, cálculo incremental O(n)) ─────────────
+// El calcMACD() de arriba devuelve sólo el último histograma; para detectar
+// un cruce y medir el rango hace falta la serie entera.
+function emaSerie(v,p){
+  if(v.length<p)return null;
+  const k=2/(p+1),out=new Array(v.length).fill(null);
+  let s=0;for(let i=0;i<p;i++)s+=v[i];
+  out[p-1]=s/p;
+  for(let i=p;i<v.length;i++)out[i]=v[i]*k+out[i-1]*(1-k);
+  return out;
+}
+function calcMACDFull(c,f=12,sl=26,sg=9){
+  if(c.length<sl+sg+5)return null;
+  const ef=emaSerie(c,f),es=emaSerie(c,sl);
+  if(!ef||!es)return null;
+  const macd=c.map((_,i)=>(ef[i]!==null&&es[i]!==null)?ef[i]-es[i]:null);
+  const i0=macd.findIndex(v=>v!==null);
+  const sigV=emaSerie(macd.slice(i0),sg);
+  if(!sigV)return null;
+  const signal=new Array(i0).fill(null).concat(sigV);
+  const hist=macd.map((v,i)=>(v!==null&&signal[i]!==null)?v-signal[i]:null);
+  return{macd,signal,hist};
+}
+
+// ── DETECTOR DE REVERSIÓN ────────────────────────────────────────────────
+function detectarReversion(closes,fila){
+  const minBarras=26+9+REV.ventanaRango;
+  if(!closes||closes.length<minBarras)
+    return{ok:false,nd:true,falta:['Historia insuficiente ('+(closes?closes.length:0)+'/'+minBarras+')']};
+
+  const m=calcMACDFull(closes);
+  if(!m)return{ok:false,nd:true,falta:['No se pudo calcular MACD']};
+  const rsiS=calcRSISerie(closes);
+  const t=closes.length-1;
+  if(m.macd[t]===null||m.signal[t]===null||rsiS[t]===null)
+    return{ok:false,nd:true,falta:['Indicadores incompletos']};
+
+  // R1 — cruce alcista del MACD sobre su señal dentro de la ventana
+  let bc=null;
+  for(let i=t;i>=t-REV.ventanaCruce&&i>0;i--){
+    if(m.macd[i-1]!==null&&m.signal[i-1]!==null&&m.macd[i-1]<=m.signal[i-1]&&m.macd[i]>m.signal[i]){bc=i;break;}
+  }
+  const r1=bc!==null;
+  // R2 — el cruce ocurre por debajo de cero
+  const r2=REV.exigirBajoCero?(r1&&m.macd[bc]<0):true;
+  // R3 — MACD en la parte baja de su propio rango reciente
+  const vent=m.macd.slice(t-REV.ventanaRango+1,t+1).filter(v=>v!==null);
+  const mn=Math.min(...vent),mx=Math.max(...vent);
+  const pos=(mx===mn)?0.5:(m.macd[t]-mn)/(mx-mn);
+  const r3=pos<=REV.percentilMacd;
+  // R4 / R5 — RSI bajo y girando
+  const rsi=rsiS[t],rsiAyer=rsiS[t-1];
+  const r4=rsi<REV.rsiMax;
+  const r5=!REV.rsiDebeSubir||(rsiAyer!==null&&rsi>rsiAyer);
+  // R6 — R/B con stop bajo el mínimo reciente y objetivo en la primera resistencia
+  const precio=n(fila.Precio);
+  const minRec=Math.min(...closes.slice(-REV.ventanaStop));
+  const stop=minRec*REV.colchonStop;
+  const sma50=n(fila.SMA50),max52=n(fila['Max 52s']);
+  const obj=(sma50>precio)?sma50:(max52>precio?max52:0);
+  const riesgo=precio-stop, benef=obj-precio;
+  const rb=(riesgo>0&&benef>0)?benef/riesgo:0;
+  const r6=rb>=REV.rbMin;
+
+  const reglas={r1,r2,r3,r4,r5,r6};
+  const falta=[];
+  if(!r1)falta.push('sin cruce');
+  if(!r2)falta.push('cruce sobre cero');
+  if(!r3)falta.push('MACD fuera de zona baja ('+(pos*100).toFixed(0)+'%)');
+  if(!r4)falta.push('RSI '+rsi.toFixed(1)+' (<'+REV.rsiMax+')');
+  if(!r5)falta.push('RSI no gira');
+  if(!r6)falta.push('R/B '+rb.toFixed(1)+' (≥'+REV.rbMin+')');
+
+  return{
+    ok:falta.length===0,nd:false,reglas,falta,
+    rsi:+rsi.toFixed(1), rsiAyer:rsiAyer!==null?+rsiAyer.toFixed(1):null,
+    macd:+m.macd[t].toFixed(3), signal:+m.signal[t].toFixed(3),
+    hist:+m.hist[t].toFixed(3),
+    pos:+(pos*100).toFixed(0),
+    ruedasCruce:r1?t-bc:null,
+    stop:+stop.toFixed(2), obj:+obj.toFixed(2), rb:+rb.toFixed(2),
+    cumplidas:Object.values(reglas).filter(Boolean).length
+  };
+}
+
+// RSI serie completa (Wilder) — la calcRSI() de arriba devuelve sólo el último
+function calcRSISerie(c,p=14){
+  const out=new Array(c.length).fill(null);
+  if(c.length<p+2)return out;
+  let g=0,l=0;
+  for(let i=1;i<=p;i++){const d=c[i]-c[i-1];if(d>=0)g+=d;else l-=d;}
+  let ag=g/p,al=l/p;
+  out[p]=al===0?100:100-100/(1+ag/al);
+  for(let i=p+1;i<c.length;i++){
+    const d=c[i]-c[i-1];
+    ag=(ag*(p-1)+(d>0?d:0))/p;
+    al=(al*(p-1)+(d<0?-d:0))/p;
+    out[i]=al===0?100:100-100/(1+ag/al);
+  }
+  return out;
+}
+
+// ── PRE-FILTRO: qué papeles vale la pena consultar ───────────────────────
+// Clave: NO se parte de SEÑAL=COMPRA. Esas ya son alcistas y por definición
+// nunca tendrían el MACD cruzando bajo cero con el RSI en el piso.
+function prefiltroReversion(){
+  return DATA
+    .filter(a=>{
+      if(n(a.Precio)===0)return false;
+      if(a.Tipo&&/indice|índice/i.test(a.Tipo))return false;
+      const caida=-n(a['% vs max 52s']);            // viene negativo en la planilla
+      if(!(caida>=REV.caidaMin&&caida<=REV.caidaMax))return false;
+      if(n(a.RVOL)<REV.rvolMin)return false;
+      return true;
+    })
+    .sort((a,b)=>n(b.RVOL)-n(a.RVOL))               // los más líquidos primero
+    .slice(0,REV.maxCandidatos);
+}
+
+async function fetchReversion(){
+  if(!REV.activo)return;
+  const cands=prefiltroReversion();
+  const tb=document.getElementById('tb-rev');
+  if(!cands.length){
+    tb.innerHTML='<tr><td colspan="16" class="empty"><div class="eico">🟣</div>Ningún papel pasa el pre-filtro (caída entre '+(REV.caidaMin*100)+'% y '+(REV.caidaMax*100)+'% con RVOL ≥ '+REV.rvolMin+').</td></tr>';
+    document.getElementById('fcrev').textContent='0';
+    return;
+  }
+  const res=[],casi=[];
+  for(let i=0;i<cands.length;i++){
+    const a=cands[i];
+    tb.innerHTML='<tr><td colspan="16" class="empty"><div class="loading-row"><div class="mini-spin"></div>Reversión: '+(i+1)+'/'+cands.length+' — '+a.Ticker+'</div></td></tr>';
+    const closes=await fetchCloses(a.Ticker,REV.diasHistoria,REV.maxBarras);
+    const d=detectarReversion(closes,a);
+    if(d.ok)res.push({...a,rev:d});
+    else if(!d.nd&&d.cumplidas>=4)casi.push({...a,rev:d});
+    if(REV.pausaMs)await new Promise(r=>setTimeout(r,REV.pausaMs));
+  }
+  res.sort((x,y)=>y.rev.rb-x.rev.rb);
+  casi.sort((x,y)=>y.rev.cumplidas-x.rev.cumplidas);
+  REV_LIST=res;REV_CASI=casi;
+  renderRev();
+}
+
+function renderRev(){
+  const res=REV_LIST,casi=REV_CASI;
+  document.getElementById('fcrev').textContent=res.length;
+  document.getElementById('t-rev').textContent=res.length;
+  document.getElementById('fcrevs').textContent=
+    res.length===0?(casi.length?casi.length+' cerca':'Sin cruces hoy')
+    :res.length===1?'1 cruce confirmado':res.length+' cruces confirmados';
+
+  // Banner
+  const br=document.getElementById('b-rev');
+  if(res.length){
+    br.innerHTML=`<div class="banner" style="background:rgba(163,113,247,.07);border:1px solid rgba(163,113,247,.3);margin-bottom:10px">
+      <div class="btitle purp">🟣 ${res.length} REVERSIÓN${res.length>1?'ES':''} — MACD cruzó al alza bajo cero con RSI en mínimo</div>
+      <div class="bitems">${res.map(a=>`<span class="bitem" style="background:rgba(163,113,247,.1);color:var(--pu);border-color:rgba(163,113,247,.3)" onclick="showBuyRev('${a.Ticker.replace(/'/g,"\\'")}')">
+        <strong>${a.Ticker}</strong> RSI ${a.rev.rsi} · R/B ${a.rev.rb.toFixed(1)} · hace ${a.rev.ruedasCruce}r
+      </span>`).join('')}</div></div>`;
+  } else br.innerHTML='';
+
+  const tb=document.getElementById('tb-rev');
+  tb.innerHTML='';
+  if(!res.length){
+    tb.innerHTML='<tr><td colspan="16" class="empty"><div class="eico">🟣</div>Ningún cruce alcista bajo cero con RSI en mínimo ahora.'+(casi.length?'<br><span style="font-size:11px">'+casi.length+' papeles a 1 regla — ver abajo.</span>':'')+'</td></tr>';
+  } else {
+    res.forEach(a=>{
+      const d=a.rev,varD=n(a['Var % dia']),rvol=n(a.RVOL),pvm=n(a['% vs max 52s']);
+      const tr=document.createElement('tr');
+      tr.innerHTML=`
+        <td class="tc">${a.Ticker}</td>
+        <td class="nc">${a.Nombre}</td>
+        <td class="pc">$${f2(a.Precio)}</td>
+        <td class="${varD>=0?'pos':'neg'}">${varD>=0?'+':''}${varD.toFixed(2)}%</td>
+        <td class="${rvol>=1.5?'pos':'neu'}">${rvol.toFixed(2)}x</td>
+        <td class="purp" style="font-weight:700">${d.rsi}</td>
+        <td class="neu">${d.rsiAyer!==null?d.rsiAyer:'—'}</td>
+        <td class="${d.macd<0?'neg':'pos'}">${d.macd}</td>
+        <td class="neu">${d.signal}</td>
+        <td class="purp">hace ${d.ruedasCruce}r</td>
+        <td class="${d.pos<=20?'pos':'yel'}">${d.pos}%</td>
+        <td class="neg">${(pvm*100).toFixed(1)}%</td>
+        <td class="neg">$${d.stop.toFixed(2)}</td>
+        <td class="pos">$${d.obj.toFixed(2)}</td>
+        <td class="${d.rb>=2?'pos':'yel'}">${d.rb.toFixed(1)}:1</td>
+        <td><button class="btn" style="background:var(--pub);color:var(--pu);border:1px solid var(--pus)" onclick="showBuyRev('${a.Ticker.replace(/'/g,"\\'")}')">🟣 Ver señal</button></td>`;
+      tb.appendChild(tr);
+    });
+  }
+
+  // Tabla secundaria: a 1 o 2 reglas
+  const cd=document.getElementById('rev-casi');
+  if(casi.length){
+    cd.innerHTML=`<div style="color:var(--m);font-size:11px;margin-bottom:6px">A 1-2 reglas del cruce (${casi.length})</div>
+    <div class="tw"><table><thead><tr><th>Ticker</th><th>Nombre</th><th>Precio</th><th>Cumple</th><th>RSI</th><th>MACD</th><th>Pos. rango</th><th>R/B</th><th>Qué falta</th></tr></thead><tbody>
+    ${casi.map(a=>`<tr>
+      <td class="tc">${a.Ticker}</td><td class="nc">${a.Nombre}</td>
+      <td class="pc">$${f2(a.Precio)}</td>
+      <td class="purp">${a.rev.cumplidas}/6</td>
+      <td>${a.rev.rsi}</td><td class="${a.rev.macd<0?'neg':'pos'}">${a.rev.macd}</td>
+      <td>${a.rev.pos}%</td><td>${a.rev.rb.toFixed(1)}:1</td>
+      <td style="color:var(--y);font-size:10px">${a.rev.falta.join(' · ')}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+  } else cd.innerHTML='';
+}
+
+function showBuyRev(ticker){
+  const a=REV_LIST.find(x=>x.Ticker===ticker)||REV_CASI.find(x=>x.Ticker===ticker);
+  if(!a)return;
+  const d=a.rev,precio=n(a.Precio);
+  const rbc=d.rb>=2?'var(--g)':d.rb>=1.5?'var(--y)':'var(--r)';
+  document.getElementById('mh').className='mh';
+  document.getElementById('mh').style.background='var(--pub)';
+  document.getElementById('mh').style.color='var(--pu)';
+  document.getElementById('mt').textContent='🟣 '+ticker+' — REVERSIÓN';
+  document.getElementById('mb').innerHTML=`
+    <div class="mr"><span class="mk">Activo</span><span class="mv">${ticker} — ${a.Nombre}</span></div>
+    <div class="mr"><span class="mk">Precio</span><span class="mv" style="color:var(--bl)">$${precio.toFixed(2)}</span></div>
+    <div class="mr"><span class="mk">Cruce MACD</span><span class="mv purp">hace ${d.ruedasCruce} rueda${d.ruedasCruce===1?'':'s'} · MACD ${d.macd} / señal ${d.signal}</span></div>
+    <div class="mr"><span class="mk">MACD en su rango</span><span class="mv">${d.pos}% (0% = mínimo de ${REV.ventanaRango} ruedas)</span></div>
+    <div class="mr"><span class="mk">RSI</span><span class="mv purp">${d.rsi} ${d.rsiAyer!==null?'(ayer '+d.rsiAyer+')':''}</span></div>
+    <div class="mdiv"></div>
+    <div class="mr"><span class="mk">Stop (mín. ${REV.ventanaStop}r −1%)</span><span class="mv neg">$${d.stop.toFixed(2)} <span style="font-size:10px;color:var(--m)">(${((d.stop/precio-1)*100).toFixed(1)}%)</span></span></div>
+    <div class="mr"><span class="mk">Objetivo (1ª resistencia)</span><span class="mv pos">$${d.obj.toFixed(2)} <span style="font-size:10px;color:var(--m)">(+${((d.obj/precio-1)*100).toFixed(1)}%)</span></span></div>
+    <div class="rbd">
+      <div><div class="rbl">Riesgo</div><div class="rbv neg">-$${(precio-d.stop).toFixed(2)}</div></div>
+      <div><div class="rbl">Beneficio</div><div class="rbv pos">+$${(d.obj-precio).toFixed(2)}</div></div>
+      <div><div class="rbl">R/B</div><div class="rbv" style="color:${rbc}">${d.rb.toFixed(1)}:1</div></div>
+    </div>
+    ${d.ok?'':`<div class="mr"><span class="mk yel">Reglas sin cumplir</span><span class="mv yel" style="font-size:11px">${d.falta.join(' · ')}</span></div>`}
+    <div style="font-size:10px;color:var(--y);margin-top:8px;line-height:1.5">⚠️ Entrada contra la tendencia. El stop está pegado al mínimo reciente: si lo perfora, la tesis se rompió.</div>`;
+  document.getElementById('mf').innerHTML=`
+    <button class="mfbtn" style="background:var(--pu);color:#000" onclick="regFrom('${ticker.replace(/'/g,"\\'")}','${a.Nombre.replace(/'/g,"\\'")}',${precio},${d.obj},${d.stop})">✅ Registrar compra</button>
+    <button class="mfbtn mfbtn-dis" onclick="cm()">Descartar</button>`;
+  document.getElementById('ovl').classList.add('on');
 }
 
 function calcScore(a,rsi,macdH,c8){
@@ -567,6 +861,7 @@ async function fetchMomentum(){
   const wND=watch.filter(a=>a.rsi===null).length;
   const sub=[];if(wReal)sub.push(wReal+' esperando momentum');if(wND)sub.push(wND+' sin datos');
   document.getElementById('fc2s').textContent=sub.join(' · ')||'Sin candidatos';
+  fetchReversion();
 }
 
 function renderN4(enriched){
@@ -824,6 +1119,7 @@ function showBuy(ticker,nombre,precio,max52,sma200,score){
   const ri=precio-sma200,be=max52-precio,rb=ri>0?be/ri:0;
   const rbc=rb>=2?'var(--g)':rb>=1.5?'var(--y)':'var(--r)';
   document.getElementById('mh').className='mh mh-buy';
+  document.getElementById('mh').style.background='';document.getElementById('mh').style.color='';
   document.getElementById('mt').textContent='🔔 '+ticker+' — SEÑAL CONFIRMADA';
   document.getElementById('mb').innerHTML=`
     <div class="mr"><span class="mk">Activo</span><span class="mv">${ticker} — ${nombre}</span></div>
@@ -847,6 +1143,7 @@ function showSell(idx,tipo){
   const p=POS[idx];if(!p)return;
   const pnl=((p.act/p.e)-1)*100,etp=tipo==='tp';
   document.getElementById('mh').className='mh '+(etp?'mh-tp':'mh-sell');
+  document.getElementById('mh').style.background='';document.getElementById('mh').style.color='';
   document.getElementById('mt').textContent=etp?'🎯 OBJETIVO — '+p.t:'⛔ STOP LOSS — '+p.t;
   document.getElementById('mb').innerHTML=`
     <div class="mr"><span class="mk">Entrada</span><span class="mv">$${p.e.toFixed(2)}</span></div>
@@ -897,7 +1194,7 @@ function sw(name,el){
 }
 function swName(name){
   const tabs=document.querySelectorAll('.tab');
-  ['n1','n2','n4','n3','pos','panel','hist'].forEach((nm,i)=>{
+  ['n1','n2','n4','rev','n3','pos','panel','hist'].forEach((nm,i)=>{
     tabs[i].classList.toggle('on',nm===name);
     document.getElementById('panel-'+nm).classList.toggle('on',nm===name);
   });
