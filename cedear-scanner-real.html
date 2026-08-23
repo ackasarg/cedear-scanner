@@ -400,8 +400,37 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <script>
 // CONFIG
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTtu0kxPNrZXtQNHyaxo0uCZUTEaVI2mwd-AzV-EbZ6OWeD6WxpxFEh5gzL-qfDeKTcWKaXPFRfvthf/pub?output=csv';
-const PROXIES = ['https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
-const YP = 'https://corsproxy.io/?';
+// Cinco vías, empezando por el intento directo (a veces Google y Yahoo
+// permiten el pedido sin proxy, y ahí el problema desaparece del todo).
+const FUENTES = [
+  {n:'directo',      f:u=>u},
+  {n:'corsproxy.io', f:u=>'https://corsproxy.io/?'+encodeURIComponent(u)},
+  {n:'allorigins',   f:u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)},
+  {n:'codetabs',     f:u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)},
+  {n:'thingproxy',   f:u=>'https://thingproxy.freeboard.io/fetch/'+u}
+];
+let FPREF = -1;   // la que funcionó last: se prueba primero y evita reintentar las caídas
+
+// Trae una URL probando las fuentes en orden. Devuelve el texto o lanza error.
+async function traer(url,{minBytes=50,esperaJSON=false}={}){
+  const orden=[];
+  if(FPREF>=0)orden.push(FPREF);
+  FUENTES.forEach((_,i)=>{if(i!==FPREF)orden.push(i);});
+  let ultimo='sin intentos';
+  for(const i of orden){
+    try{
+      const r=await fetch(FUENTES[i].f(url));
+      if(!r.ok){ultimo='HTTP '+r.status+' ('+FUENTES[i].n+')';continue;}
+      const t=await r.text();
+      if(!t||t.trim().length<minBytes){ultimo='respuesta vacía ('+FUENTES[i].n+')';continue;}
+      if(!esperaJSON && /<!DOCTYPE|<html/i.test(t.slice(0,200))){ultimo='HTML en vez de CSV ('+FUENTES[i].n+')';continue;}
+      FPREF=i;
+      return t;
+    }catch(e){ ultimo=(e.message||'error')+' ('+FUENTES[i].n+')'; }
+  }
+  throw new Error(ultimo);
+}
+const nombreFuente=()=>FPREF>=0?FUENTES[FPREF].n:'ninguna';
 const INT = 30*60*1000;
 const RSI_MIN=45, RSI_MAX=65;
 
@@ -501,9 +530,7 @@ async function fetchCloses(ticker,diasCal=90,maxBarras=45){
   try{
     const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
     const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
-    const res=await fetch(YP+encodeURIComponent(url));
-    if(!res.ok)return null;
-    const js=await res.json();
+    const js=JSON.parse(await traer(url,{esperaJSON:true}));
     const closes=js?.chart?.result?.[0]?.indicators?.quote?.[0]?.close;
     if(!closes)return null;
     return closes.filter(c=>c!=null).slice(-maxBarras);
@@ -516,9 +543,7 @@ async function fetchBars(ticker,diasCal=400,maxBarras=250){
   try{
     const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
     const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
-    const res=await fetch(YP+encodeURIComponent(url));
-    if(!res.ok)return null;
-    const js=await res.json();
+    const js=JSON.parse(await traer(url,{esperaJSON:true}));
     const q=js?.chart?.result?.[0]?.indicators?.quote?.[0];
     if(!q||!q.close)return null;
     const out=[];
@@ -1047,11 +1072,11 @@ function calcScore(a,rsi,macdH,c8){
 
 // CARGAR
 async function cargar(){
-  const url=PROXIES[pIdx%PROXIES.length]+encodeURIComponent(CSV_URL+'&nc='+Date.now());
   try{
-    const res=await fetch(url);if(!res.ok)throw new Error('http');
-    const text=await res.text();
+    document.getElementById('lmsg').textContent='Bajando la planilla...';
+    const text=await traer(CSV_URL+'&nc='+Date.now());
     DATA=parseCSV(text).filter(r=>r.Ticker&&r.Nombre);
+    if(!DATA.length)throw new Error('la planilla llegó pero sin filas válidas');
     document.getElementById('ldo').classList.add('h');
     document.getElementById('upd').textContent='Actualizado: '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
     tStart=Date.now();
@@ -1060,8 +1085,16 @@ async function cargar(){
     fetchReversion().then(fetchMomentum);
   }catch(e){
     pIdx++;
-    document.getElementById('lmsg').textContent='Proxy caído, probando alternativa '+(pIdx%PROXIES.length+1)+'/'+PROXIES.length+'...';
-    setTimeout(cargar,4000);
+    const m=document.getElementById('lmsg');
+    if(pIdx<=3){
+      m.textContent='Ninguna vía respondió ('+e.message+'). Reintento '+pIdx+'/3 en 5s...';
+      setTimeout(cargar,5000);
+    }else{
+      m.innerHTML='<span style="color:var(--r)">No se pudo bajar la planilla.</span><br>'
+        +'<span style="font-size:11px">Último error: '+e.message+'</span><br>'
+        +'<span style="font-size:11px">Probá: abrir el CSV a mano para ver si la planilla sigue publicada, '
+        +'o esperar unos minutos (los proxies gratuitos limitan por cantidad de pedidos).</span>';
+    }
   }
 }
 
