@@ -252,7 +252,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
       Es la única regla que le sacó ventaja clara al azar en el backtest sobre tus 408 CEDEARs:
       <strong>+0,40R por operación</strong> (117 ops, profit factor 1,67) contra +0,23R de entrar al azar.
       <br><strong>Deliberadamente NO filtra por nivel de RSI, ni zona baja, ni R/B.</strong> El backtest mostró que cada filtro extra bajaba el rendimiento — las 6 reglas quedaron en +0,085R, menos de la mitad que el azar.
-      <br>El objetivo es <strong>3× el riesgo</strong>, que es como se midió. Cambiarlo invalida el número de arriba.
+      <br>El objetivo es <strong>3× el riesgo</strong> y el stop <strong>2×ATR</strong>, que es como se midió. Cambiarlos invalida el número de arriba.
+      <br>El <strong>◆</strong> en Volumen marca RVOL ≥ 1,5: con volumen alto la divergencia rindió <strong>+0,62R</strong> contra +0,48R (403 ops, profit factor 1,95). Es información, no un filtro — no descartes una señal por no tenerlo.
       <br><span style="color:var(--y)">⚠️ 117 operaciones es una muestra chica, y el período medido fue alcista. No hay evidencia de cómo rinde en una caída sostenida.</span>
     </div>
     <div id="diag" style="padding:0 0 10px;color:var(--m);font-size:11px"></div>
@@ -260,9 +261,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <th>Ticker</th><th>Nombre</th><th>Precio</th><th>Var%</th><th>RVOL</th>
       <th>RSI</th><th>MACD</th><th>Cruce</th>
       <th>Mín. 1</th><th>Mín. 2</th><th>Precio</th><th>RSI</th><th>Hace</th>
-      <th>Stop</th><th>Objetivo 3R</th><th>Acción</th>
+      <th>Volumen</th><th>Stop (2×ATR)</th><th>Objetivo 3R</th><th>Acción</th>
     </tr></thead><tbody id="tb-al">
-      <tr><td colspan="16" class="empty"><div class="eico">⏳</div>Analizando...</td></tr>
+      <tr><td colspan="17" class="empty"><div class="eico">⏳</div>Analizando...</td></tr>
     </tbody></table></div>
   </div>
 
@@ -428,6 +429,8 @@ const REV = {
   rsiMax:        40,    // R4: RSI por debajo de esto
   rsiDebeSubir:  true,  // R5: RSI girando al alza
   rbMin:         1.5,   // R6: ratio Riesgo/Beneficio mínimo
+  atrMult:       2,     // Alerta: stop = precio - 2 x ATR(14). Medido, no elegido a ojo.
+  rvolBueno:     1.5,   // referencia: con volumen alto la divergencia rindió +0,62R vs +0,48R
 
   // ── VIGILANCIA: acercándose al cruce, todavía en negativo ──
   vgPercentil:   0.45,  // MACD en el 45% más bajo (más laxo que la alerta)
@@ -507,6 +510,52 @@ async function fetchCloses(ticker,diasCal=90,maxBarras=45){
   }catch(e){return null;}
 }
 
+// Igual que fetchCloses pero conservando high/low/volume, que la misma
+// respuesta de Yahoo ya trae: hacen falta para ATR y RVOL.
+async function fetchBars(ticker,diasCal=400,maxBarras=250){
+  try{
+    const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
+    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
+    const res=await fetch(YP+encodeURIComponent(url));
+    if(!res.ok)return null;
+    const js=await res.json();
+    const q=js?.chart?.result?.[0]?.indicators?.quote?.[0];
+    if(!q||!q.close)return null;
+    const out=[];
+    for(let i=0;i<q.close.length;i++){
+      const c=q.close[i],h=q.high?.[i],l=q.low?.[i],v=q.volume?.[i];
+      if(c==null)continue;
+      out.push({c, h:(h==null?c:h), l:(l==null?c:l), v:(v==null?0:v)});
+    }
+    return out.length?out.slice(-maxBarras):null;
+  }catch(e){return null;}
+}
+
+// ATR de Wilder — incluye los huecos de apertura, que un simple high-low no ve.
+function calcATR(bars,p=14){
+  if(!bars||bars.length<p+2)return null;
+  const tr=[0];
+  for(let i=1;i<bars.length;i++){
+    tr.push(Math.max(bars[i].h-bars[i].l,
+                     Math.abs(bars[i].h-bars[i-1].c),
+                     Math.abs(bars[i].l-bars[i-1].c)));
+  }
+  let s=0;for(let i=1;i<=p;i++)s+=tr[i];
+  let a=s/p;
+  for(let i=p+1;i<bars.length;i++)a=(a*(p-1)+tr[i])/p;
+  return a;
+}
+
+// Volumen relativo al promedio de las 20 ruedas previas.
+function calcRVOL(bars,p=20){
+  if(!bars||bars.length<p+1)return null;
+  const t=bars.length-1;
+  let s=0;for(let k=t-p;k<t;k++)s+=bars[k].v;
+  const prom=s/p;
+  if(!(prom>0))return null;
+  return bars[t].v/prom;
+}
+
 // ── MACD COMPLETO (series enteras, cálculo incremental O(n)) ─────────────
 // El calcMACD() de arriba devuelve sólo el último histograma; para detectar
 // un cruce y medir el rango hace falta la serie entera.
@@ -532,7 +581,7 @@ function calcMACDFull(c,f=12,sl=26,sg=9){
 }
 
 // ── DETECTOR DE REVERSIÓN ────────────────────────────────────────────────
-function detectarReversion(closes,fila){
+function detectarReversion(closes,fila,bars){
   const minBarras=26+9+REV.ventanaRango;
   if(!closes||closes.length<minBarras)
     return{ok:false,nd:true,falta:['Historia insuficiente ('+(closes?closes.length:0)+'/'+minBarras+')']};
@@ -575,7 +624,13 @@ function detectarReversion(closes,fila){
   // El backtest (4.476 operaciones) mostro que cada filtro extra empeoraba
   // el rendimiento. Objetivo = 3x el riesgo, que es como se midio.
   const div = divergenciaAlcista(closes,rsiS,t);
-  const objA = precio + riesgo*3;
+  // Stop por ATR: el backtest mostró que mejora +0,12R sobre la divergencia
+  // (y prácticamente nada en el resto de los patrones).
+  const atr = calcATR(bars,14);
+  const rvolY = calcRVOL(bars,20);
+  const stopA = (atr && atr>0) ? precio - REV.atrMult*atr : stop;
+  const riesgoA = precio - stopA;
+  const objA = riesgoA>0 ? precio + riesgoA*3 : precio + riesgo*3;
   const alertaOk = r1 && m.macd[bc]<0 && div!==null;
 
   const reglas={r1,r2,r3,r4,r5,r6};
@@ -615,6 +670,7 @@ function detectarReversion(closes,fila){
   return{
     ok:falta.length===0,nd:false,reglas,falta,acercandose,
     alertaOk, div, objA:+objA.toFixed(2), rbA:3,
+    stopA:+stopA.toFixed(2), atr:atr?+atr.toFixed(2):null, rvolY:rvolY?+rvolY.toFixed(2):null,
     cruceGenerico, zona, rel:+rel.toFixed(2),
     hist3:hOk?h.map(v=>+v.toFixed(3)):null, ruedasAlCruce,
     rsi:+rsi.toFixed(1), rsiAyer:rsiAyer!==null?+rsiAyer.toFixed(1):null,
@@ -728,7 +784,7 @@ async function fetchReversion(){
       ' &nbsp;·&nbsp; '+alerta.length+' alertas · '+vigil.length+' en vigilancia'+
       (sinDatos?' · '+sinDatos+' sin datos':'')+'</div>';
     if(hechos%3===0||hechos===total){
-      tbA.innerHTML='<tr><td colspan="16" class="empty">'+prog+'</td></tr>';
+      tbA.innerHTML='<tr><td colspan="17" class="empty">'+prog+'</td></tr>';
       tbV.innerHTML='<tr><td colspan="15" class="empty">'+prog+'</td></tr>';
       tbC.innerHTML='<tr><td colspan="17" class="empty">'+prog+'</td></tr>';
       const tbS=document.getElementById('tb-seis');
@@ -736,9 +792,10 @@ async function fetchReversion(){
     }
   };
   await poolMap(cands,REV.concurrencia,async(a)=>{
-    const closes=await fetchCloses(a.Ticker,REV.diasHistoria,REV.maxBarras);
-    if(!closes){sinDatos++;return null;}
-    const d=detectarReversion(closes,a);
+    const bars=await fetchBars(a.Ticker,REV.diasHistoria,REV.maxBarras);
+    if(!bars){sinDatos++;return null;}
+    const closes=bars.map(b=>b.c);
+    const d=detectarReversion(closes,a,bars);
     if(d.nd){histCorta++;return null;}
     if(d.alertaOk)alerta.push({...a,rev:d});          // regla validada por el backtest
     if(d.ok)seis.push({...a,rev:d});                 // las 6 reglas, ahora en pestaña aparte
@@ -769,7 +826,7 @@ function renderAlerta(){
     b.innerHTML=`<div class="banner" style="background:rgba(163,113,247,.07);border:1px solid rgba(163,113,247,.3);margin-bottom:10px">
       <div class="btitle purp">★ ${res.length} SEÑAL${res.length>1?'ES':''} — cruce MACD bajo cero + divergencia alcista del RSI</div>
       <div class="bitems">${res.map(a=>`<span class="bitem" style="background:rgba(163,113,247,.1);color:var(--pu);border-color:rgba(163,113,247,.3)" onclick="showBuyRev('${a.Ticker.replace(/'/g,"\\'")}')">
-        <strong>${a.Ticker}</strong> RSI ${a.rev.div.rsiA}→${a.rev.div.rsiB} · precio ${a.rev.div.caidaPct}%
+        <strong>${a.Ticker}</strong> RSI ${a.rev.div.rsiA}→${a.rev.div.rsiB} · precio ${a.rev.div.caidaPct}%${a.rev.rvolY>=REV.rvolBueno?' · vol '+a.rev.rvolY.toFixed(1)+'× ◆':''}
       </span>`).join('')}</div></div>`;
   } else b.innerHTML='';
 
@@ -782,7 +839,7 @@ function renderAlerta(){
       +(d.histCorta?` · <span style="color:var(--y)">${d.histCorta} con historia insuficiente</span>`:'');
   }
   if(!res.length){
-    tb.innerHTML='<tr><td colspan="16" class="empty"><div class="eico">🟣</div>Ningún papel con cruce bajo cero y divergencia alcista hoy.<br><span style="font-size:11px">Es normal: en el backtest esta señal apareció 117 veces en 408 papeles sobre 2 años.</span></td></tr>';
+    tb.innerHTML='<tr><td colspan="17" class="empty"><div class="eico">🟣</div>Ningún papel con cruce bajo cero y divergencia alcista hoy.<br><span style="font-size:11px">Es normal: en el backtest esta señal apareció 117 veces en 408 papeles sobre 2 años.</span></td></tr>';
     return;
   }
   res.forEach(a=>{
@@ -802,7 +859,8 @@ function renderAlerta(){
       <td class="neg">${v.caidaPct}%</td>
       <td class="pos">+${v.rsiDelta}</td>
       <td class="neu">${v.ruedasDesde}r</td>
-      <td class="neg">$${d.stop.toFixed(2)}</td>
+      <td class="${d.rvolY>=REV.rvolBueno?'pos':'neu'}">${d.rvolY!==null?d.rvolY.toFixed(2)+'x':'—'}${d.rvolY>=REV.rvolBueno?' ◆':''}</td>
+      <td class="neg">$${d.stopA.toFixed(2)} <span style="font-size:10px;color:var(--m)">${d.atr?'ATR '+d.atr:''}</span></td>
       <td class="pos">$${d.objA.toFixed(2)} <span style="font-size:10px;color:var(--m)">(3R)</span></td>
       <td><button class="btn" style="background:var(--pub);color:var(--pu);border:1px solid var(--pus)" onclick="showBuyRev('${a.Ticker.replace(/'/g,"\\'")}')">🟣 Ver señal</button></td>`;
     tb.appendChild(tr);
@@ -940,7 +998,8 @@ function showBuyRev(ticker){
   if(!a)return;
   const d=a.rev,precio=n(a.Precio);
   // La Alerta usa objetivo 3R (como se midio en el backtest); el resto, la 1a resistencia
-  const obj = esAlerta ? d.objA : d.obj;
+  const obj  = esAlerta ? d.objA  : d.obj;
+  const stopUsado = esAlerta ? d.stopA : d.stop;
   const rbv = esAlerta ? 3 : d.rb;
   const rbc = rbv>=2?'var(--g)':rbv>=1.5?'var(--y)':'var(--r)';
   document.getElementById('mh').className='mh';
@@ -954,10 +1013,11 @@ function showBuyRev(ticker){
     <div class="mr"><span class="mk">MACD en su rango</span><span class="mv">${d.pos}% (0% = mínimo de ${REV.ventanaRango} ruedas)</span></div>
     <div class="mr"><span class="mk">RSI</span><span class="mv purp">${d.rsi} ${d.rsiAyer!==null?'(ayer '+d.rsiAyer+')':''}</span></div>
     <div class="mdiv"></div>
-    <div class="mr"><span class="mk">Stop (mín. ${REV.ventanaStop}r −1%)</span><span class="mv neg">$${d.stop.toFixed(2)} <span style="font-size:10px;color:var(--m)">(${((d.stop/precio-1)*100).toFixed(1)}%)</span></span></div>
+    <div class="mr"><span class="mk">${esAlerta?'Stop (2×ATR)':'Stop (mín. '+REV.ventanaStop+'r −1%)'}</span><span class="mv neg">$${stopUsado.toFixed(2)} <span style="font-size:10px;color:var(--m)">(${((stopUsado/precio-1)*100).toFixed(1)}%)</span></span></div>
+    ${esAlerta&&d.rvolY!==null?`<div class="mr"><span class="mk">Volumen</span><span class="mv ${d.rvolY>=REV.rvolBueno?'pos':'neu'}">${d.rvolY.toFixed(2)}× el promedio de 20 ruedas${d.rvolY>=REV.rvolBueno?' — con volumen alto la divergencia rindió +0,62R vs +0,48R':''}</span></div>`:''}
     <div class="mr"><span class="mk">${esAlerta?'Objetivo (3× el riesgo)':'Objetivo (1ª resistencia)'}</span><span class="mv pos">$${obj.toFixed(2)} <span style="font-size:10px;color:var(--m)">(+${((obj/precio-1)*100).toFixed(1)}%)</span></span></div>
     <div class="rbd">
-      <div><div class="rbl">Riesgo</div><div class="rbv neg">-$${(precio-d.stop).toFixed(2)}</div></div>
+      <div><div class="rbl">Riesgo</div><div class="rbv neg">-$${(precio-stopUsado).toFixed(2)}</div></div>
       <div><div class="rbl">Beneficio</div><div class="rbv pos">+$${(obj-precio).toFixed(2)}</div></div>
       <div><div class="rbl">R/B</div><div class="rbv" style="color:${rbc}">${rbv.toFixed(1)}:1</div></div>
     </div>
