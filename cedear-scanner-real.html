@@ -607,20 +607,39 @@ async function fetchCloses(ticker,diasCal=90,maxBarras=45){
 // Igual que fetchCloses pero conservando high/low/volume, que la misma
 // respuesta de Yahoo ya trae: hacen falta para ATR y RVOL.
 async function fetchBars(ticker,diasCal=400,maxBarras=250){
-  try{
-    const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
-    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
-    const js=JSON.parse(await traer(url,{esperaJSON:true}));
-    const q=js?.chart?.result?.[0]?.indicators?.quote?.[0];
-    if(!q||!q.close)return null;
-    const out=[];
-    for(let i=0;i<q.close.length;i++){
-      const c=q.close[i],h=q.high?.[i],l=q.low?.[i],v=q.volume?.[i];
-      if(c==null)continue;
-      out.push({c, h:(h==null?c:h), l:(l==null?c:l), v:(v==null?0:v)});
-    }
-    return out.length?out.slice(-maxBarras):null;
-  }catch(e){return null;}
+  const to=Math.floor(Date.now()/1000),from=to-diasCal*86400;
+  const u1=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&period1=${from}&period2=${to}`;
+  // Algunos proxies rompen period1/period2. range=2y es equivalente y más simple.
+  const u2=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2y`;
+  let txt=null;
+  for(const url of [u1,u2]){
+    try{ txt=await traer(url,{esperaJSON:true}); break; }
+    catch(e){ /* la causa ya quedó anotada dentro de traer() */ }
+  }
+  if(txt===null)return null;
+  // A partir de acá Yahoo SÍ respondió: cualquier fallo es de contenido,
+  // y hay que anotarlo o el problema queda invisible (pasó exactamente eso).
+  let js;
+  try{ js=JSON.parse(txt); }
+  catch(e){ anotarError('Yahoo','respuesta no es JSON'); return null; }
+
+  const err=js?.chart?.error;
+  if(err){ anotarError('Yahoo', 'error API: '+(err.code||err.description||'?')); return null; }
+
+  const res=js?.chart?.result?.[0];
+  if(!res){ anotarError('Yahoo','sin result'); return null; }
+  const q=res?.indicators?.quote?.[0];
+  if(!q||!q.close){ anotarError('Yahoo','sin serie de cierres'); return null; }
+
+  const out=[];
+  for(let i=0;i<q.close.length;i++){
+    const c=q.close[i],h=q.high?.[i],l=q.low?.[i],v=q.volume?.[i];
+    if(c==null)continue;
+    out.push({c, h:(h==null?c:h), l:(l==null?c:l), v:(v==null?0:v)});
+  }
+  if(!out.length){ anotarError('Yahoo','serie vacía'); return null; }
+  if(out.length<120){ anotarError('Yahoo','sólo '+out.length+' ruedas (se necesitan 120+)'); return null; }
+  return out.slice(-maxBarras);
 }
 
 // ATR de Wilder — incluye los huecos de apertura, que un simple high-low no ve.
