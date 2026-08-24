@@ -513,6 +513,13 @@ const REV = {
   rvolMin:       0.15,  // liquidez mínima
 
   // ── ZONA MÁXIMOS: los que el pre-filtro deja afuera por estar arriba ──
+  // ── MODO PLANILLA ──
+  // Si está el gid de la hoja "Senales", el scanner LEE de ahí en vez de
+  // calcular. La planilla no depende de proxies: es la solución de fondo al
+  // problema de CORS. Si falla o los datos son viejos, cae al modo Yahoo.
+  gidSenales:     '1474243570',   // hoja "Senales" publicada como CSV
+  maxDiasSenales: 4,       // si las señales son más viejas que esto, avisa
+
   escanearMaximos: true,   // false = no los consulta (más rápido)
   maxCercania:     0.06,   // "en máximos" = a menos del 6% del máx. de 52 semanas
   maxTope:         120,    // tope de tickers de esta categoría
@@ -921,7 +928,76 @@ async function poolMap(items,limite,fn,onProgress){
   return out;
 }
 
+// ── LECTURA DESDE LA PLANILLA ─────────────────────────────────────────
+// Devuelve null si no está configurado o si no se pudo leer, para que el
+// llamador caiga al modo Yahoo sin romperse.
+async function leerSenalesPlanilla(){
+  if(!REV.gidSenales)return null;
+  let txt;
+  try{
+    txt=await traer(CSV_URL+'&gid='+REV.gidSenales+'&nc='+Date.now());
+  }catch(e){ anotarError('Planilla', e.message); return null; }
+
+  const lin=txt.replace(/\r/g,'').trim().split('\n');
+  if(lin.length<2)return {vacio:true, filas:[]};
+  const hd=pLine(lin[0]).map(x=>x.trim());
+  const iC={};
+  hd.forEach((h,i)=>{iC[h]=i;});
+  if(iC['Categoria']===undefined){ anotarError('Planilla','falta la columna Categoria'); return null; }
+
+  const filas=[];
+  for(let i=1;i<lin.length;i++){
+    const v=pLine(lin[i]);
+    const tk=(v[iC['Ticker']]||'').trim();
+    if(!tk)continue;
+    const g=k=>{const x=v[iC[k]];return x===undefined?'':String(x).trim();};
+    const num=k=>{const f=parseFloat(g(k).replace(',','.'));return isNaN(f)?null:f;};
+    const divA=num('DivPrecioA');
+    filas.push({
+      Ticker:tk, Nombre:g('Nombre'), Precio:g('Precio'),
+      'Var % dia':g('VarPct'), RVOL:g('RVOL'), '% vs max 52s':g('vsMax52'),
+      cat:g('Categoria'),
+      rev:{
+        rsi:num('RSI'), rsiAyer:num('RSIayer'),
+        macd:num('MACD'), signal:num('Signal'), hist:num('Hist'),
+        ruedasCruce:num('RuedasCruce'), pos:num('PosRango'), zona:g('Zona'),
+        div: divA===null?null:{
+          precioA:divA, precioB:num('DivPrecioB'),
+          rsiA:num('DivRsiA'), rsiB:num('DivRsiB'),
+          caidaPct:num('DivCaidaPct'), rsiDelta:num('DivRsiDelta'),
+          ruedasDesde:num('DivRuedas')
+        },
+        rvolY:num('RvolY'), atr:num('ATR'),
+        stop:num('Stop'), stopA:num('Stop'), obj:num('Objetivo'), objA:num('Objetivo'),
+        rb:3, ruedasAlCruce:num('RuedasCruce'),
+        hist3:null, alertaOk:g('Categoria')==='ALERTA', ok:g('Categoria')==='SEIS'
+      }
+    });
+  }
+  return {vacio:filas.length===0, filas};
+}
+
 async function fetchReversion(){
+  // 1) Intento leer lo ya calculado en la planilla
+  const desdePlanilla=await leerSenalesPlanilla();
+  if(desdePlanilla && !desdePlanilla.vacio){
+    const f=desdePlanilla.filas;
+    const de=c=>f.filter(x=>x.cat===c);
+    REV_LIST=de('ALERTA');
+    REV_CASI=de('VIGILANCIA');
+    REV_SEIS=de('SEIS');
+    REV_CRUCES=de('CRUCE');
+    REV_MAX=de('MAXIMOS');
+    REV_DIAG={total:f.length, universo:DATA.length, sinDatos:0, histCorta:0, seg:0, fuente:'planilla'};
+    renderAlerta();renderVigil();renderCruces();renderSeis();renderMaximos();
+    fetchPosIndicadores();
+    return;
+  }
+  // 2) Si no hay planilla configurada o vino vacía, calculo con Yahoo (modo viejo)
+  return fetchReversionYahoo();
+}
+
+async function fetchReversionYahoo(){
   if(!REV.activo)return;
   const base=prefiltroReversion();
   const maximos=prefiltroMaximos().map(a=>({...a,__max:true}));
@@ -1006,7 +1082,9 @@ function renderAlerta(){
   if(dg&&REV_DIAG){
     const d=REV_DIAG;
     const err=resumenErrores();
-    dg.innerHTML=`Escaneados <strong style="color:var(--t)">${d.total}</strong> de ${d.universo} papeles en ${d.seg}s`
+    dg.innerHTML = d.fuente==='planilla'
+      ? `<span class="pos">✔ Señales leídas de la planilla</span> — ${d.total} filas. Sin llamadas a Yahoo ni proxies.`
+      : `Escaneados <strong style="color:var(--t)">${d.total}</strong> de ${d.universo} papeles en ${d.seg}s`
       +(d.sinDatos?` · <span style="color:var(--r)">${d.sinDatos} sin respuesta</span>`:'')
       +(d.histCorta?` · <span style="color:var(--y)">${d.histCorta} con historia insuficiente</span>`:'')
       +(FPREF['query1.finance.yahoo.com']!==undefined?` · vía <strong>${FUENTES[FPREF['query1.finance.yahoo.com']].n}</strong>`:'')
